@@ -11,7 +11,7 @@
 #define MAX_ENEMIES 10
 #define MAX_BULLETS 20
 #define BULLET_SPEED 7.0f
-#define SHOOT_COOLDOWN 20  
+#define SHOOT_COOLDOWN 20
 
 typedef struct {
     Vector2 position;
@@ -38,12 +38,17 @@ void resetGame(Enemy enemies[], Vector2 bulletPos[], bool bulletActive[], Rectan
 }
 
 int main(void) {
-    InitAudioDevice();
-    Sound shootSound = LoadSound("pew.mp3");
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Desvia ai");
-    SetExitKey(KEY_NULL);
+    InitAudioDevice();
     SetTargetFPS(60);
+    SetExitKey(KEY_NULL);
     srand(time(NULL));
+
+    Sound shootSound = LoadSound("pew.mp3");
+    Music music = LoadMusicStream("trilha-sonora.mp3");
+    PlayMusicStream(music);
+    float musicVolume = 1.0f;
+    bool isMuted = false;
 
     Rectangle player;
     Enemy enemies[MAX_ENEMIES];
@@ -57,18 +62,18 @@ int main(void) {
     float playerSpeed = 5.0f;
 
     GameState state = STATE_MENU;
-
-    float shootCooldownTimer = 0.0f; 
+    float shootCooldownTimer = 0.0f;
 
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
+        UpdateMusicStream(music);
 
         if (state == STATE_MENU) {
             if (IsKeyPressed(KEY_ENTER)) {
                 resetGame(enemies, bulletPos, bulletActive, &player, &lives, &score, &gameOver);
                 damaged = false;
                 damageTimer = 0.0f;
-                shootCooldownTimer = 0.0f; 
+                shootCooldownTimer = 0.0f;
                 state = STATE_PLAYING;
             }
         }
@@ -83,7 +88,6 @@ int main(void) {
 
                 if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) player.x -= playerSpeed;
                 if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) player.x += playerSpeed;
-
                 if (player.x < 0) player.x = 0;
                 if (player.x > SCREEN_WIDTH - PLAYER_WIDTH) player.x = SCREEN_WIDTH - PLAYER_WIDTH;
 
@@ -93,7 +97,7 @@ int main(void) {
                             bulletPos[i] = (Vector2){ player.x + PLAYER_WIDTH / 2 - 2, player.y };
                             bulletActive[i] = true;
                             PlaySound(shootSound);
-                            shootCooldownTimer = SHOOT_COOLDOWN / 60.0f; 
+                            shootCooldownTimer = SHOOT_COOLDOWN / 60.0f;
                             break;
                         }
                     }
@@ -156,16 +160,25 @@ int main(void) {
                     damageTimer -= deltaTime;
                     if (damageTimer <= 0.0f) damaged = false;
                 }
-            }
-            else {
+            } else {
                 state = STATE_GAMEOVER;
             }
         }
         else if (state == STATE_PAUSED) {
             if (IsKeyPressed(KEY_ESCAPE)) state = STATE_PLAYING;
+
+            Vector2 mouse = GetMousePosition();
+            Rectangle btnMute = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 50, 240, 40 };
+            if (CheckCollisionPointRec(mouse, btnMute)) {
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    isMuted = !isMuted;
+                    SetMusicVolume(music, isMuted ? 0.0f : musicVolume);
+                }
+            }
         }
         else if (state == STATE_GAMEOVER) {
             if (IsKeyPressed(KEY_ESCAPE)) state = STATE_MENU;
+
             Vector2 mousePoint = GetMousePosition();
             Rectangle btnRec = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 60, 240, 40 };
             if (CheckCollisionPointRec(mousePoint, btnRec) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -181,76 +194,48 @@ int main(void) {
         ClearBackground(BLACK);
 
         if (state == STATE_MENU) {
-            const char *title = "DESVIA AI";
-            int titleSize = 50;
-            int titleWidth = MeasureText(title, titleSize);
-            DrawText(title, (SCREEN_WIDTH - titleWidth) / 2, SCREEN_HEIGHT / 2 - 100, titleSize, YELLOW);
-
-            const char *prompt = "Press ENTER to start";
-            int promptSize = 20;
-            int promptWidth = MeasureText(prompt, promptSize);
-            DrawText(prompt, (SCREEN_WIDTH - promptWidth) / 2, SCREEN_HEIGHT / 2, promptSize, LIGHTGRAY);
+            DrawText("DESVIA AI", SCREEN_WIDTH/2 - MeasureText("DESVIA AI", 50)/2, 200, 50, YELLOW);
+            DrawText("Press ENTER to start", SCREEN_WIDTH/2 - MeasureText("Press ENTER to start", 20)/2, 300, 20, LIGHTGRAY);
         }
         else if (state == STATE_PLAYING) {
             DrawRectangleRec(player, damaged ? RED : BLUE);
-
             for (int i = 0; i < MAX_ENEMIES; i++) {
                 if (enemies[i].active) {
-                    Color enemyColor = RED;
-                    if (enemies[i].hits == 1) enemyColor = ORANGE;
-                    DrawRectangleV(enemies[i].position, (Vector2){ ENEMY_SIZE, ENEMY_SIZE }, enemyColor);
+                    Color color = (enemies[i].hits == 1) ? ORANGE : RED;
+                    DrawRectangleV(enemies[i].position, (Vector2){ENEMY_SIZE, ENEMY_SIZE}, color);
                 }
             }
-
             for (int i = 0; i < MAX_BULLETS; i++) {
                 if (bulletActive[i]) {
                     DrawRectangle(bulletPos[i].x, bulletPos[i].y, 4, 10, YELLOW);
                 }
             }
-
             DrawText(TextFormat("Pontos: %d", score), 10, 10, 20, WHITE);
             DrawText(TextFormat("Vidas: %d", lives), SCREEN_WIDTH - 100, 10, 20, WHITE);
         }
         else if (state == STATE_PAUSED) {
-            const char *pauseText = "PAUSE";
-            int fontSize = 40;
-            int textWidth = MeasureText(pauseText, fontSize);
-            DrawText(pauseText, (SCREEN_WIDTH - textWidth) / 2, SCREEN_HEIGHT / 2 - 20, fontSize, YELLOW);
-            const char *resumeText = "Press ESC to resume";
-            int resumeSize = 20;
-            int resumeWidth = MeasureText(resumeText, resumeSize);
-            DrawText(resumeText, (SCREEN_WIDTH - resumeWidth) / 2, SCREEN_HEIGHT / 2 + 30, resumeSize, LIGHTGRAY);
+            DrawText("PAUSE", SCREEN_WIDTH/2 - MeasureText("PAUSE", 40)/2, 200, 40, YELLOW);
+            Rectangle btnMute = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 50, 240, 40 };
+            DrawRectangleRec(btnMute, DARKGRAY);
+            const char *label = isMuted ? "Desmutar Música" : "Mutar Música";
+            DrawText(label, btnMute.x + (btnMute.width - MeasureText(label, 20)) / 2, btnMute.y + 10, 20, WHITE);
         }
         else if (state == STATE_GAMEOVER) {
-            const char *gameOverText = "GAME OVER";
-            int gameOverFontSize = 40;
-            int gameOverTextWidth = MeasureText(gameOverText, gameOverFontSize);
-            DrawText(gameOverText, (SCREEN_WIDTH - gameOverTextWidth) / 2, SCREEN_HEIGHT / 2 - 30, gameOverFontSize, RED);
-
-            char finalScoreText[64];
-            snprintf(finalScoreText, sizeof(finalScoreText), "Pontuação Final: %d", score);
-            int finalScoreFontSize = 20;
-            int finalScoreTextWidth = MeasureText(finalScoreText, finalScoreFontSize);
-            DrawText(finalScoreText, (SCREEN_WIDTH - finalScoreTextWidth) / 2, SCREEN_HEIGHT / 2 + 20, finalScoreFontSize, WHITE);
+            DrawText("GAME OVER", SCREEN_WIDTH/2 - MeasureText("GAME OVER", 40)/2, 200, 40, RED);
+            char finalScore[64];
+            sprintf(finalScore, "Pontuação Final: %d", score);
+            DrawText(finalScore, SCREEN_WIDTH/2 - MeasureText(finalScore, 20)/2, 260, 20, WHITE);
 
             Rectangle btnRec = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 60, 240, 40 };
             DrawRectangleRec(btnRec, DARKGRAY);
-
-            const char *btnLabel = "Jogar Novamente";
-            int btnFontSize = 20;
-            int btnLabelWidth = MeasureText(btnLabel, btnFontSize);
-            DrawText(btnLabel, btnRec.x + (btnRec.width - btnLabelWidth) / 2, btnRec.y + 10, btnFontSize, LIGHTGRAY);
-
-            Vector2 mousePoint = GetMousePosition();
-            if (CheckCollisionPointRec(mousePoint, btnRec)) {
-                DrawRectangleRec(btnRec, GRAY);
-            }
+            DrawText("Jogar Novamente", btnRec.x + (btnRec.width - MeasureText("Jogar Novamente", 20)) / 2, btnRec.y + 10, 20, LIGHTGRAY);
         }
 
         EndDrawing();
     }
 
     UnloadSound(shootSound);
+    UnloadMusicStream(music);
     CloseAudioDevice();
     CloseWindow();
 
