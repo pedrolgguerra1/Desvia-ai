@@ -3,15 +3,15 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
-#define PLAYER_WIDTH 50
-#define PLAYER_HEIGHT 20
-#define ENEMY_SIZE 20
-#define MAX_ENEMIES 10
-#define MAX_BULLETS 20
-#define BULLET_SPEED 7.0f
-#define SHOOT_COOLDOWN 20
+#define LARGURA_TELA 800
+#define ALTURA_TELA 600
+#define LARGURA_JOGADOR 50
+#define ALTURA_JOGADOR 20
+#define TAMANHO_INIMIGO 20
+#define MAX_INIMIGOS 10
+#define MAX_TIROS 20
+#define VELOCIDADE_TIRO 7.0f
+#define INTERVALO_TIRO 20
 
 typedef struct {
     Vector2 position;
@@ -22,23 +22,23 @@ typedef struct {
 typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_GAMEOVER } GameState;
 
 void resetGame(Enemy enemies[], Vector2 bulletPos[], bool bulletActive[], Rectangle *player, int *lives, int *score, bool *gameOver) {
-    *player = (Rectangle){ SCREEN_WIDTH / 2 - PLAYER_WIDTH / 2, SCREEN_HEIGHT - 50, PLAYER_WIDTH, PLAYER_HEIGHT };
+    *player = (Rectangle){ LARGURA_TELA / 2 - LARGURA_JOGADOR / 2, ALTURA_TELA - 50, LARGURA_JOGADOR, ALTURA_JOGADOR };
     *lives = 3;
     *score = 0;
     *gameOver = false;
 
-    for (int i = 0; i < MAX_ENEMIES; i++) {
-        enemies[i].position = (Vector2){ rand() % (SCREEN_WIDTH - ENEMY_SIZE), -(rand() % 600) };
+    for (int i = 0; i < MAX_INIMIGOS; i++) {
+        enemies[i].position = (Vector2){ rand() % (LARGURA_TELA - TAMANHO_INIMIGO), -(rand() % 600) };
         enemies[i].active = true;
         enemies[i].hits = 0;
     }
-    for (int i = 0; i < MAX_BULLETS; i++) {
+    for (int i = 0; i < MAX_TIROS; i++) {
         bulletActive[i] = false;
     }
 }
 
 int main(void) {
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Desvia ai");
+    InitWindow(LARGURA_TELA, ALTURA_TELA, "Desvia ai");
     InitAudioDevice();
     SetTargetFPS(60);
     SetExitKey(KEY_NULL);
@@ -50,10 +50,13 @@ int main(void) {
     float musicVolume = 1.0f;
     bool isMuted = false;
 
+    Texture2D textureNave = LoadTexture("nave.png");
+    Texture2D textureAsteroide = LoadTexture("asteroide.png");
+
     Rectangle player;
-    Enemy enemies[MAX_ENEMIES];
-    Vector2 bulletPos[MAX_BULLETS];
-    bool bulletActive[MAX_BULLETS];
+    Enemy enemies[MAX_INIMIGOS];
+    Vector2 bulletPos[MAX_TIROS];
+    bool bulletActive[MAX_TIROS];
     int lives, score;
     bool gameOver;
     bool damaged = false;
@@ -89,63 +92,63 @@ int main(void) {
                 if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) player.x -= playerSpeed;
                 if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) player.x += playerSpeed;
                 if (player.x < 0) player.x = 0;
-                if (player.x > SCREEN_WIDTH - PLAYER_WIDTH) player.x = SCREEN_WIDTH - PLAYER_WIDTH;
+                if (player.x > LARGURA_TELA - LARGURA_JOGADOR) player.x = LARGURA_TELA - LARGURA_JOGADOR;
 
                 if (IsKeyDown(KEY_SPACE) && shootCooldownTimer <= 0.0f) {
-                    for (int i = 0; i < MAX_BULLETS; i++) {
+                    for (int i = 0; i < MAX_TIROS; i++) {
                         if (!bulletActive[i]) {
-                            bulletPos[i] = (Vector2){ player.x + PLAYER_WIDTH / 2 - 2, player.y };
+                            bulletPos[i] = (Vector2){ player.x + LARGURA_JOGADOR / 2 - 2, player.y };
                             bulletActive[i] = true;
                             PlaySound(shootSound);
-                            shootCooldownTimer = SHOOT_COOLDOWN / 60.0f;
+                            shootCooldownTimer = INTERVALO_TIRO / 60.0f;
                             break;
                         }
                     }
                 }
 
-                for (int i = 0; i < MAX_BULLETS; i++) {
+                for (int i = 0; i < MAX_TIROS; i++) {
                     if (bulletActive[i]) {
-                        bulletPos[i].y -= BULLET_SPEED;
+                        bulletPos[i].y -= VELOCIDADE_TIRO;
                         if (bulletPos[i].y < 0) bulletActive[i] = false;
                     }
                 }
 
-                for (int i = 0; i < MAX_ENEMIES; i++) {
+                for (int i = 0; i < MAX_INIMIGOS; i++) {
                     if (enemies[i].active) {
                         enemies[i].position.y += 2;
-                        if (enemies[i].position.y > SCREEN_HEIGHT) {
-                            enemies[i].position.y = -ENEMY_SIZE;
-                            enemies[i].position.x = rand() % (SCREEN_WIDTH - ENEMY_SIZE);
+                        if (enemies[i].position.y > ALTURA_TELA) {
+                            enemies[i].position.y = -TAMANHO_INIMIGO;
+                            enemies[i].position.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
                             enemies[i].hits = 0;
                         }
 
-                        Rectangle enemyRec = { enemies[i].position.x, enemies[i].position.y, ENEMY_SIZE, ENEMY_SIZE };
+                        Rectangle enemyRec = { enemies[i].position.x, enemies[i].position.y, TAMANHO_INIMIGO, TAMANHO_INIMIGO };
                         if (CheckCollisionRecs(player, enemyRec)) {
                             lives--;
                             damaged = true;
                             damageTimer = damageDuration;
-                            enemies[i].position.y = -ENEMY_SIZE;
-                            enemies[i].position.x = rand() % (SCREEN_WIDTH - ENEMY_SIZE);
+                            enemies[i].position.y = -TAMANHO_INIMIGO;
+                            enemies[i].position.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
                             enemies[i].hits = 0;
                             if (lives <= 0) gameOver = true;
                         }
                     }
                 }
 
-                for (int i = 0; i < MAX_BULLETS; i++) {
+                for (int i = 0; i < MAX_TIROS; i++) {
                     if (bulletActive[i]) {
-                        for (int j = 0; j < MAX_ENEMIES; j++) {
+                        for (int j = 0; j < MAX_INIMIGOS; j++) {
                             if (enemies[j].active) {
                                 Rectangle bulletRec = { bulletPos[i].x, bulletPos[i].y, 4, 10 };
-                                Rectangle enemyRec = { enemies[j].position.x, enemies[j].position.y, ENEMY_SIZE, ENEMY_SIZE };
+                                Rectangle enemyRec = { enemies[j].position.x, enemies[j].position.y, TAMANHO_INIMIGO, TAMANHO_INIMIGO };
                                 if (CheckCollisionRecs(bulletRec, enemyRec)) {
                                     bulletActive[i] = false;
                                     enemies[j].hits++;
                                     if (enemies[j].hits >= 2) {
                                         enemies[j].active = false;
                                         score += 10;
-                                        enemies[j].position.y = -ENEMY_SIZE;
-                                        enemies[j].position.x = rand() % (SCREEN_WIDTH - ENEMY_SIZE);
+                                        enemies[j].position.y = -TAMANHO_INIMIGO;
+                                        enemies[j].position.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
                                         enemies[j].active = true;
                                         enemies[j].hits = 0;
                                     }
@@ -168,7 +171,7 @@ int main(void) {
             if (IsKeyPressed(KEY_ESCAPE)) state = STATE_PLAYING;
 
             Vector2 mouse = GetMousePosition();
-            Rectangle btnMute = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 50, 240, 40 };
+            Rectangle btnMute = { LARGURA_TELA / 2 - 120, ALTURA_TELA / 2 + 50, 240, 40 };
             if (CheckCollisionPointRec(mouse, btnMute)) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     isMuted = !isMuted;
@@ -180,7 +183,7 @@ int main(void) {
             if (IsKeyPressed(KEY_ESCAPE)) state = STATE_MENU;
 
             Vector2 mousePoint = GetMousePosition();
-            Rectangle btnRec = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 60, 240, 40 };
+            Rectangle btnRec = { LARGURA_TELA / 2 - 120, ALTURA_TELA / 2 + 60, 240, 40 };
             if (CheckCollisionPointRec(mousePoint, btnRec) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 resetGame(enemies, bulletPos, bulletActive, &player, &lives, &score, &gameOver);
                 damaged = false;
@@ -194,39 +197,40 @@ int main(void) {
         ClearBackground(BLACK);
 
         if (state == STATE_MENU) {
-            DrawText("DESVIA AI", SCREEN_WIDTH/2 - MeasureText("DESVIA AI", 50)/2, 200, 50, YELLOW);
-            DrawText("Press ENTER to start", SCREEN_WIDTH/2 - MeasureText("Press ENTER to start", 20)/2, 300, 20, LIGHTGRAY);
+            DrawText("DESVIA AI", LARGURA_TELA/2 - MeasureText("DESVIA AI", 50)/2, 200, 50, YELLOW);
+            DrawText("Press ENTER to start", LARGURA_TELA/2 - MeasureText("Press ENTER to start", 20)/2, 300, 20, LIGHTGRAY);
         }
         else if (state == STATE_PLAYING) {
-            DrawRectangleRec(player, damaged ? RED : BLUE);
-            for (int i = 0; i < MAX_ENEMIES; i++) {
+            DrawTextureEx(textureNave, (Vector2){ player.x, player.y }, 0.0f, 0.2f, damaged ? RED : WHITE);
+
+            for (int i = 0; i < MAX_INIMIGOS; i++) {
                 if (enemies[i].active) {
-                    Color color = (enemies[i].hits == 1) ? ORANGE : RED;
-                    DrawRectangleV(enemies[i].position, (Vector2){ENEMY_SIZE, ENEMY_SIZE}, color);
+                    DrawTextureEx(textureAsteroide, enemies[i].position, 0.0f, 0.1f, enemies[i].hits == 1 ? GRAY : WHITE);
                 }
             }
-            for (int i = 0; i < MAX_BULLETS; i++) {
+
+            for (int i = 0; i < MAX_TIROS; i++) {
                 if (bulletActive[i]) {
                     DrawRectangle(bulletPos[i].x, bulletPos[i].y, 4, 10, YELLOW);
                 }
             }
             DrawText(TextFormat("Pontos: %d", score), 10, 10, 20, WHITE);
-            DrawText(TextFormat("Vidas: %d", lives), SCREEN_WIDTH - 100, 10, 20, WHITE);
+            DrawText(TextFormat("Vidas: %d", lives), LARGURA_TELA - 100, 10, 20, WHITE);
         }
         else if (state == STATE_PAUSED) {
-            DrawText("PAUSE", SCREEN_WIDTH/2 - MeasureText("PAUSE", 40)/2, 200, 40, YELLOW);
-            Rectangle btnMute = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 50, 240, 40 };
+            DrawText("PAUSE", LARGURA_TELA/2 - MeasureText("PAUSE", 40)/2, 200, 40, YELLOW);
+            Rectangle btnMute = { LARGURA_TELA / 2 - 120, ALTURA_TELA / 2 + 50, 240, 40 };
             DrawRectangleRec(btnMute, DARKGRAY);
             const char *label = isMuted ? "Desmutar Música" : "Mutar Música";
             DrawText(label, btnMute.x + (btnMute.width - MeasureText(label, 20)) / 2, btnMute.y + 10, 20, WHITE);
         }
         else if (state == STATE_GAMEOVER) {
-            DrawText("GAME OVER", SCREEN_WIDTH/2 - MeasureText("GAME OVER", 40)/2, 200, 40, RED);
+            DrawText("GAME OVER", LARGURA_TELA/2 - MeasureText("GAME OVER", 40)/2, 200, 40, RED);
             char finalScore[64];
             sprintf(finalScore, "Pontuação Final: %d", score);
-            DrawText(finalScore, SCREEN_WIDTH/2 - MeasureText(finalScore, 20)/2, 260, 20, WHITE);
+            DrawText(finalScore, LARGURA_TELA/2 - MeasureText(finalScore, 20)/2, 260, 20, WHITE);
 
-            Rectangle btnRec = { SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 60, 240, 40 };
+            Rectangle btnRec = { LARGURA_TELA / 2 - 120, ALTURA_TELA / 2 + 60, 240, 40 };
             DrawRectangleRec(btnRec, DARKGRAY);
             DrawText("Jogar Novamente", btnRec.x + (btnRec.width - MeasureText("Jogar Novamente", 20)) / 2, btnRec.y + 10, 20, LIGHTGRAY);
         }
@@ -234,6 +238,8 @@ int main(void) {
         EndDrawing();
     }
 
+    UnloadTexture(textureNave);
+    UnloadTexture(textureAsteroide);
     UnloadSound(shootSound);
     UnloadMusicStream(music);
     CloseAudioDevice();
