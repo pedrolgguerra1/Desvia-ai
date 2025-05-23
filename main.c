@@ -157,6 +157,7 @@ int main(void) {
         EndDrawing();
     }
 
+    system("pause");
+
     CloseWindow();
-    return 0;
 }
