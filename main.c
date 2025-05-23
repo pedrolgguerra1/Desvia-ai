@@ -221,7 +221,7 @@ int main(void) {
                     i = inimigos;
                     while (i) {
                         if (i->ativo) {
-                            Rectangle recTiro = { t->posicao.x, t->posicao.y, 4, 10 };
+                            Rectangle recTiro = { t->posicao.x - 2, t->posicao.y, 8, 20 }; 
                             Rectangle recInimigo = { i->posicao.x, i->posicao.y, TAMANHO_INIMIGO, TAMANHO_INIMIGO };
                             if (CheckCollisionRecs(recTiro, recInimigo)) {
                                 t->ativo = false;
@@ -285,7 +285,7 @@ int main(void) {
 
             NoInimigo *i = inimigos;
             while (i) {
-                if (i->ativo)
+                if (i->ativo) 
                     DrawTextureEx(texturaAsteroide, i->posicao, 0.0f, 0.15f, i->acertos == 1 ? GRAY : WHITE);
                 i = i->proximo;
             }
@@ -310,8 +310,8 @@ int main(void) {
 
             Rectangle botaoMutar = { LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 80, 200, 40 };
             DrawRectangleRec(botaoMutar, LIGHTGRAY);
-            const char *textoBotao = musicaSilenciada ? "Desmutar" : "Mutar";
-            DrawText(textoBotao, botaoMutar.x + (botaoMutar.width - MeasureText(textoBotao, 20)) / 2, botaoMutar.y + 10, 20, WHITE);
+            const char *textoBotao = musicaSilenciada ? "Reativar Som" : "Silenciar Som";
+            DrawText(textoBotao, botaoMutar.x + (botaoMutar.width - MeasureText(textoBotao, 20)) / 2, botaoMutar.y + 10, 20, BLACK);
         } 
         else if (estado == ESTADO_FIMDEJOGO) {
             DrawText("FIM DE JOGO", LARGURA_TELA/2 - MeasureText("FIM DE JOGO", 50)/2, 200, 50, RED);
