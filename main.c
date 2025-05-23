@@ -7,280 +7,328 @@
 #define ALTURA_TELA 600
 #define LARGURA_JOGADOR 50
 #define ALTURA_JOGADOR 20
-#define TAMANHO_INIMIGO 20
+#define TAMANHO_INIMIGO 40
 #define MAX_INIMIGOS 10
 #define MAX_TIROS 20
 #define VELOCIDADE_TIRO 7.0f
-#define INTERVALO_TIRO 20
-#define MAX_TOP_SCORES 5
+#define INTERVALO_TIRO 0.3f
+#define MAX_PONTUACOES_TOP 5
 
-typedef struct EnemyNode {
-    Vector2 position;
-    bool active;
-    int hits;
-    struct EnemyNode *next;
-} EnemyNode;
+typedef struct NoInimigo {
+    Vector2 posicao;
+    bool ativo;
+    int acertos;
+    struct NoInimigo *proximo;
+} NoInimigo;
 
-typedef struct BulletNode {
-    Vector2 position;
-    bool active;
-    struct BulletNode *next;
-} BulletNode;
+typedef struct NoTiro {
+    Vector2 posicao;
+    bool ativo;
+    struct NoTiro *proximo;
+} NoTiro;
 
-typedef enum { STATE_MENU, STATE_PLAYING, STATE_PAUSED, STATE_GAMEOVER } GameState;
+typedef enum { ESTADO_MENU, ESTADO_JOGANDO, ESTADO_PAUSADO, ESTADO_FIMDEJOGO } EstadoJogo;
 
-int topScores[MAX_TOP_SCORES] = {0};
+int pontuacoesTop[MAX_PONTUACOES_TOP] = {0};
 
-void loadTopScores() {
-    FILE *file = fopen("top_score.txt", "r");
-    if (file) {
-        for (int i = 0; i < MAX_TOP_SCORES; i++) {
-            fscanf(file, "%d", &topScores[i]);
+void carregarPontuacoesTop() {
+    FILE *arquivo = fopen("top_score.txt", "r");
+    if (arquivo) {
+        for (int i = 0; i < MAX_PONTUACOES_TOP; i++) {
+            fscanf(arquivo, "%d", &pontuacoesTop[i]);
         }
-        fclose(file);
+        fclose(arquivo);
     }
 }
 
-void saveTopScores() {
-    FILE *file = fopen("top_score.txt", "w");
-    if (file) {
-        for (int i = 0; i < MAX_TOP_SCORES; i++) {
-            fprintf(file, "%d\n", topScores[i]);
+void salvarPontuacoesTop() {
+    FILE *arquivo = fopen("top_score.txt", "w");
+    if (arquivo) {
+        for (int i = 0; i < MAX_PONTUACOES_TOP; i++) {
+            fprintf(arquivo, "%d\n", pontuacoesTop[i]);
         }
-        fclose(file);
+        fclose(arquivo);
     }
 }
 
-void updateTopScores(int newScore) {
-    for (int i = 0; i < MAX_TOP_SCORES; i++) {
-        if (newScore > topScores[i]) {
-            for (int j = MAX_TOP_SCORES - 1; j > i; j--) {
-                topScores[j] = topScores[j - 1];
+void atualizarPontuacoesTop(int novaPontuacao) {
+    for (int i = 0; i < MAX_PONTUACOES_TOP; i++) {
+        if (novaPontuacao > pontuacoesTop[i]) {
+            for (int j = MAX_PONTUACOES_TOP - 1; j > i; j--) {
+                pontuacoesTop[j] = pontuacoesTop[j - 1];
             }
-            topScores[i] = newScore;
+            pontuacoesTop[i] = novaPontuacao;
             break;
         }
     }
 }
 
-void addEnemy(EnemyNode **head, int x, int y) {
-    EnemyNode *newEnemy = malloc(sizeof(EnemyNode));
-    newEnemy->position = (Vector2){ x, y };
-    newEnemy->active = true;
-    newEnemy->hits = 0;
-    newEnemy->next = *head;
-    *head = newEnemy;
+void adicionarInimigo(NoInimigo **cabeca, int x, int y) {
+    NoInimigo *novoInimigo = malloc(sizeof(NoInimigo));
+    novoInimigo->posicao = (Vector2){ x, y };
+    novoInimigo->ativo = true;
+    novoInimigo->acertos = 0;
+    novoInimigo->proximo = *cabeca;
+    *cabeca = novoInimigo;
 }
 
-void addBullet(BulletNode **head, Vector2 position) {
-    BulletNode *newBullet = malloc(sizeof(BulletNode));
-    newBullet->position = position;
-    newBullet->active = true;
-    newBullet->next = *head;
-    *head = newBullet;
+void adicionarTiro(NoTiro **cabeca, Vector2 posicao) {
+    NoTiro *novoTiro = malloc(sizeof(NoTiro));
+    novoTiro->posicao = posicao;
+    novoTiro->ativo = true;
+    novoTiro->proximo = *cabeca;
+    *cabeca = novoTiro;
 }
 
-void freeEnemies(EnemyNode *head) {
-    while (head) {
-        EnemyNode *temp = head;
-        head = head->next;
+void liberarInimigos(NoInimigo *cabeca) {
+    while (cabeca) {
+        NoInimigo *temp = cabeca;
+        cabeca = cabeca->proximo;
         free(temp);
     }
 }
 
-void freeBullets(BulletNode *head) {
-    while (head) {
-        BulletNode *temp = head;
-        head = head->next;
+void liberarTiros(NoTiro *cabeca) {
+    while (cabeca) {
+        NoTiro *temp = cabeca;
+        cabeca = cabeca->proximo;
         free(temp);
     }
 }
 
 int main(void) {
     InitWindow(LARGURA_TELA, ALTURA_TELA, "Desvia ai");
+    SetExitKey(0);
     InitAudioDevice();
     SetTargetFPS(60);
     srand(time(NULL));
 
-    Sound shootSound = LoadSound("pew.mp3");
-    Music music = LoadMusicStream("trilha-sonora.mp3");
-    PlayMusicStream(music);
-    float musicVolume = 1.0f;
-    bool isMuted = false;
+    Sound somTiro = LoadSound("pew.mp3");
+    Music musica = LoadMusicStream("trilha-sonora.mp3");
+    PlayMusicStream(musica);
+    bool musicaSilenciada = false;
 
-    Texture2D textureNave = LoadTexture("nave.png");
-    Texture2D textureAsteroide = LoadTexture("asteroide.png");
+    Texture2D texturaNave = LoadTexture("nave.png");
+    Texture2D texturaAsteroide = LoadTexture("asteroide.png");
 
-    Rectangle player = { LARGURA_TELA/2 - LARGURA_JOGADOR/2, ALTURA_TELA - 60, LARGURA_JOGADOR, ALTURA_JOGADOR };
-    int lives = 3, score = 0;
-    bool damaged = false, gameOver = false;
-    float damageTimer = 0.0f, shootCooldownTimer = 0.0f;
-    const float damageDuration = 0.3f;
-    float playerSpeed = 5.0f;
+    Rectangle jogador = { LARGURA_TELA/2 - LARGURA_JOGADOR/2, ALTURA_TELA - 60, LARGURA_JOGADOR, ALTURA_JOGADOR };
+    int vidas = 3;
+    int pontuacao = 0;
+    bool danificado = false;
+    float temporizadorDano = 0.0f, temporizadorRecargaTiro = 0.0f;
+    const float duracaoDano = 0.3f;
+    float velocidadeJogador = 5.0f;
 
-    GameState state = STATE_MENU;
+    EstadoJogo estado = ESTADO_MENU;
 
-    EnemyNode *enemies = NULL;
-    BulletNode *bullets = NULL;
+    NoInimigo *inimigos = NULL;
+    NoTiro *tiros = NULL;
 
-    loadTopScores();
+    carregarPontuacoesTop();
 
     for (int i = 0; i < MAX_INIMIGOS; i++) {
-        addEnemy(&enemies, rand() % (LARGURA_TELA - TAMANHO_INIMIGO), -(rand() % 600));
+        adicionarInimigo(&inimigos, rand() % (LARGURA_TELA - TAMANHO_INIMIGO), -(rand() % 600));
     }
 
     while (!WindowShouldClose()) {
-        float deltaTime = GetFrameTime();
-        UpdateMusicStream(music);
+        UpdateMusicStream(musica);
 
-        if (state == STATE_MENU) {
-            if (IsKeyPressed(KEY_ENTER)) {
-                freeEnemies(enemies);
-                freeBullets(bullets);
-                enemies = NULL;
-                bullets = NULL;
-                for (int i = 0; i < MAX_INIMIGOS; i++) {
-                    addEnemy(&enemies, rand() % (LARGURA_TELA - TAMANHO_INIMIGO), -(rand() % 600));
-                }
-                player.x = LARGURA_TELA/2 - LARGURA_JOGADOR/2;
-                lives = 3;
-                score = 0;
-                gameOver = false;
-                damaged = false;
-                damageTimer = 0.0f;
-                shootCooldownTimer = 0.0f;
-                state = STATE_PLAYING;
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            if (estado == ESTADO_JOGANDO) {
+                estado = ESTADO_PAUSADO;
+            } else if (estado == ESTADO_PAUSADO) {
+                estado = ESTADO_JOGANDO;
             }
-        } else if (state == STATE_PLAYING) {
-            if (IsKeyPressed(KEY_ESCAPE)) state = STATE_PAUSED;
+        }
 
-            if (!gameOver) {
-                if (shootCooldownTimer > 0.0f) shootCooldownTimer -= deltaTime;
+        float deltaTime = GetFrameTime();
 
-                if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) player.x -= playerSpeed;
-                if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) player.x += playerSpeed;
-                if (player.x < 0) player.x = 0;
-                if (player.x > LARGURA_TELA - LARGURA_JOGADOR) player.x = LARGURA_TELA - LARGURA_JOGADOR;
-
-                if (IsKeyDown(KEY_SPACE) && shootCooldownTimer <= 0.0f) {
-                    Vector2 pos = { player.x + LARGURA_JOGADOR/2 - 2, player.y };
-                    addBullet(&bullets, pos);
-                    PlaySound(shootSound);
-                    shootCooldownTimer = INTERVALO_TIRO / 60.0f;
+        if (estado == ESTADO_MENU) {
+            if (IsKeyPressed(KEY_ENTER)) {
+                liberarInimigos(inimigos);
+                liberarTiros(tiros);
+                inimigos = NULL;
+                tiros = NULL;
+                for (int i = 0; i < MAX_INIMIGOS; i++) {
+                    adicionarInimigo(&inimigos, rand() % (LARGURA_TELA - TAMANHO_INIMIGO), -(rand() % 600));
                 }
+                jogador.x = LARGURA_TELA/2 - LARGURA_JOGADOR/2;
+                vidas = 3;
+                pontuacao = 0;
+                danificado = false;
+                temporizadorDano = 0.0f;
+                temporizadorRecargaTiro = 0.0f;
+                estado = ESTADO_JOGANDO;
+            }
+        } 
+        else if (estado == ESTADO_JOGANDO) {
+            if (temporizadorRecargaTiro > 0.0f) temporizadorRecargaTiro -= deltaTime;
 
-                BulletNode *b = bullets;
-                while (b) {
-                    if (b->active) {
-                        b->position.y -= VELOCIDADE_TIRO;
-                        if (b->position.y < 0) b->active = false;
+            if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) jogador.x -= velocidadeJogador;
+            if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) jogador.x += velocidadeJogador;
+            if (jogador.x < 0) jogador.x = 0;
+            if (jogador.x > LARGURA_TELA - LARGURA_JOGADOR) jogador.x = LARGURA_TELA - LARGURA_JOGADOR;
+
+            if (IsKeyDown(KEY_SPACE) && temporizadorRecargaTiro <= 0.0f) {
+                Vector2 pos = { jogador.x + LARGURA_JOGADOR/2 - 2, jogador.y };
+                adicionarTiro(&tiros, pos);
+                PlaySound(somTiro);
+                temporizadorRecargaTiro = INTERVALO_TIRO;
+            }
+
+            NoTiro *t = tiros;
+            while (t) {
+                if (t->ativo) {
+                    t->posicao.y -= VELOCIDADE_TIRO;
+                    if (t->posicao.y < 0) t->ativo = false;
+                }
+                t = t->proximo;
+            }
+
+            NoInimigo *i = inimigos;
+            while (i) {
+                if (i->ativo) {
+                    i->posicao.y += 2;
+                    if (i->posicao.y > ALTURA_TELA) {
+                        i->posicao.y = -TAMANHO_INIMIGO;
+                        i->posicao.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
+                        i->acertos = 0;
+                        i->ativo = true;
                     }
-                    b = b->next;
-                }
 
-                EnemyNode *e = enemies;
-                while (e) {
-                    if (e->active) {
-                        e->position.y += 2;
-                        if (e->position.y > ALTURA_TELA) {
-                            e->position.y = -TAMANHO_INIMIGO;
-                            e->position.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
-                            e->hits = 0;
-                        }
-
-                        Rectangle enemyRec = { e->position.x, e->position.y, TAMANHO_INIMIGO, TAMANHO_INIMIGO };
-                        if (CheckCollisionRecs(player, enemyRec)) {
-                            lives--;
-                            damaged = true;
-                            damageTimer = damageDuration;
-                            e->position.y = -TAMANHO_INIMIGO;
-                            e->position.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
-                            e->hits = 0;
-                            if (lives <= 0) {
-                                gameOver = true;
-                                updateTopScores(score);
-                                saveTopScores();
-                            }
+                    Rectangle recInimigo = { i->posicao.x, i->posicao.y, TAMANHO_INIMIGO, TAMANHO_INIMIGO };
+                    if (CheckCollisionRecs(jogador, recInimigo)) {
+                        vidas--;
+                        danificado = true;
+                        temporizadorDano = duracaoDano;
+                        i->posicao.y = -TAMANHO_INIMIGO;
+                        i->posicao.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
+                        i->acertos = 0;
+                        i->ativo = true;
+                        if (vidas <= 0) {
+                            estado = ESTADO_FIMDEJOGO;
+                            atualizarPontuacoesTop(pontuacao);
+                            salvarPontuacoesTop();
                         }
                     }
-                    e = e->next;
                 }
+                i = i->proximo;
+            }
 
-                b = bullets;
-                while (b) {
-                    if (b->active) {
-                        e = enemies;
-                        while (e) {
-                            if (e->active) {
-                                Rectangle bulletRec = { b->position.x, b->position.y, 4, 10 };
-                                Rectangle enemyRec = { e->position.x, e->position.y, TAMANHO_INIMIGO, TAMANHO_INIMIGO };
-                                if (CheckCollisionRecs(bulletRec, enemyRec)) {
-                                    b->active = false;
-                                    e->hits++;
-                                    if (e->hits >= 2) {
-                                        score += 10;
-                                        e->position.y = -TAMANHO_INIMIGO;
-                                        e->position.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
-                                        e->hits = 0;
-                                    }
-                                    break;
+            t = tiros;
+            while (t) {
+                if (t->ativo) {
+                    i = inimigos;
+                    while (i) {
+                        if (i->ativo) {
+                            Rectangle recTiro = { t->posicao.x, t->posicao.y, 4, 10 };
+                            Rectangle recInimigo = { i->posicao.x, i->posicao.y, TAMANHO_INIMIGO, TAMANHO_INIMIGO };
+                            if (CheckCollisionRecs(recTiro, recInimigo)) {
+                                t->ativo = false;
+                                i->acertos++;
+                                if (i->acertos >= 2) {
+                                    pontuacao += 10;
+                                    i->posicao.y = -TAMANHO_INIMIGO;
+                                    i->posicao.x = rand() % (LARGURA_TELA - TAMANHO_INIMIGO);
+                                    i->acertos = 0;
+                                    i->ativo = true;
                                 }
+                                break;
                             }
-                            e = e->next;
                         }
+                        i = i->proximo;
                     }
-                    b = b->next;
                 }
+                t = t->proximo;
+            }
 
-                if (damaged) {
-                    damageTimer -= deltaTime;
-                    if (damageTimer <= 0.0f) damaged = false;
+            if (danificado) {
+                temporizadorDano -= deltaTime;
+                if (temporizadorDano <= 0.0f) danificado = false;
+            }
+        } 
+        else if (estado == ESTADO_PAUSADO) {
+            Rectangle botaoMutar = { LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 80, 200, 40 };
+            if (CheckCollisionPointRec(GetMousePosition(), botaoMutar) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                musicaSilenciada = !musicaSilenciada;
+                SetMusicVolume(musica, musicaSilenciada ? 0.0f : 1.0f);
+            }
+        } 
+        else if (estado == ESTADO_FIMDEJOGO) {
+            if (IsKeyPressed(KEY_ENTER)) {
+                liberarInimigos(inimigos);
+                liberarTiros(tiros);
+                inimigos = NULL;
+                tiros = NULL;
+                for (int k = 0; k < MAX_INIMIGOS; k++) {
+                    adicionarInimigo(&inimigos, rand() % (LARGURA_TELA - TAMANHO_INIMIGO), -(rand() % 600));
                 }
-            } else {
-                state = STATE_GAMEOVER;
+                jogador.x = LARGURA_TELA/2 - LARGURA_JOGADOR/2;
+                vidas = 3;
+                pontuacao = 0;
+                danificado = false;
+                temporizadorDano = 0.0f;
+                temporizadorRecargaTiro = 0.0f;
+                estado = ESTADO_JOGANDO;
             }
         }
 
         BeginDrawing();
         ClearBackground(BLACK);
 
-        if (state == STATE_MENU) {
+        if (estado == ESTADO_MENU) {
             DrawText("DESVIA AI", LARGURA_TELA/2 - MeasureText("DESVIA AI", 50)/2, 200, 50, YELLOW);
-            DrawText("Press ENTER to start", LARGURA_TELA/2 - MeasureText("Press ENTER to start", 20)/2, 300, 20, LIGHTGRAY);
-        } else if (state == STATE_PLAYING) {
-            DrawTextureEx(textureNave, (Vector2){ player.x, player.y }, 0.0f, 0.2f, damaged ? RED : WHITE);
+            DrawText("Pressione ENTER para começar", LARGURA_TELA/2 - MeasureText("Pressione ENTER para começar", 20)/2, 300, 20, LIGHTGRAY);
+        } 
+        else if (estado == ESTADO_JOGANDO) {
+            DrawTextureEx(texturaNave, (Vector2){ jogador.x, jogador.y }, 0.0f, 0.2f, danificado ? RED : WHITE);
 
-            EnemyNode *e = enemies;
-            while (e) {
-                if (e->active)
-                    DrawTextureEx(textureAsteroide, e->position, 0.0f, 0.1f, e->hits == 1 ? GRAY : WHITE);
-                e = e->next;
+            NoInimigo *i = inimigos;
+            while (i) {
+                if (i->ativo)
+                    DrawTextureEx(texturaAsteroide, i->posicao, 0.0f, 0.15f, i->acertos == 1 ? GRAY : WHITE);
+                i = i->proximo;
             }
 
-            BulletNode *b = bullets;
-            while (b) {
-                if (b->active)
-                    DrawRectangle(b->position.x, b->position.y, 4, 10, YELLOW);
-                b = b->next;
+            NoTiro *t = tiros;
+            while (t) {
+                if (t->ativo)
+                    DrawRectangle(t->posicao.x, t->posicao.y, 4, 10, YELLOW);
+                t = t->proximo;
             }
 
-            DrawText(TextFormat("Pontos: %d", score), 10, 10, 20, WHITE);
-            DrawText(TextFormat("Vidas: %d", lives), LARGURA_TELA - 100, 10, 20, WHITE);
+            DrawText(TextFormat("Pontos: %d", pontuacao), 10, 10, 20, WHITE);
+            DrawText(TextFormat("Vidas: %d", vidas), LARGURA_TELA - 100, 10, 20, WHITE);
 
-            for (int i = 0; i < MAX_TOP_SCORES; i++) {
-                DrawText(TextFormat("Top %d: %d", i+1, topScores[i]), 10, 40 + i * 20, 18, GRAY);
+            for (int k = 0; k < MAX_PONTUACOES_TOP; k++) {
+                DrawText(TextFormat("Top %d: %d", k + 1, pontuacoesTop[k]), 10, 40 + 20 * k, 15, GRAY);
             }
+        } 
+        else if (estado == ESTADO_PAUSADO) {
+            DrawText("PAUSADO", LARGURA_TELA/2 - MeasureText("PAUSADO", 40)/2, ALTURA_TELA/2 - 40, 40, YELLOW);
+            DrawText("Pressione ESC para continuar", LARGURA_TELA/2 - MeasureText("Pressione ESC para continuar", 20)/2, ALTURA_TELA/2 + 10, 20, LIGHTGRAY);
+
+            Rectangle botaoMutar = { LARGURA_TELA/2 - 100, ALTURA_TELA/2 + 80, 200, 40 };
+            DrawRectangleRec(botaoMutar, LIGHTGRAY);
+            const char *textoBotao = musicaSilenciada ? "Desmutar" : "Mutar";
+            DrawText(textoBotao, botaoMutar.x + (botaoMutar.width - MeasureText(textoBotao, 20)) / 2, botaoMutar.y + 10, 20, WHITE);
+        } 
+        else if (estado == ESTADO_FIMDEJOGO) {
+            DrawText("FIM DE JOGO", LARGURA_TELA/2 - MeasureText("FIM DE JOGO", 50)/2, 200, 50, RED);
+            DrawText(TextFormat("Sua pontuação: %d", pontuacao), LARGURA_TELA/2 - MeasureText(TextFormat("Sua pontuação: %d", pontuacao), 20)/2, 280, 20, WHITE);
+            DrawText("Pressione ENTER para reiniciar", LARGURA_TELA/2 - MeasureText("Pressione ENTER para reiniciar", 20)/2, 320, 20, LIGHTGRAY);
         }
 
         EndDrawing();
     }
 
-    freeEnemies(enemies);
-    freeBullets(bullets);
-    UnloadTexture(textureNave);
-    UnloadTexture(textureAsteroide);
-    UnloadSound(shootSound);
-    UnloadMusicStream(music);
+    liberarInimigos(inimigos);
+    liberarTiros(tiros);
+
+    UnloadSound(somTiro);
+    UnloadMusicStream(musica);
+    UnloadTexture(texturaNave);
+    UnloadTexture(texturaAsteroide);
     CloseAudioDevice();
     CloseWindow();
 
