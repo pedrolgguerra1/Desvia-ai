@@ -4,7 +4,7 @@
 ## 📝 Descrição
 Um jogo de nave espacial no estilo **vertical shooter**, onde o objetivo é **destruir asteroides** 💥 para acumular pontos ⭐.
 
-O jogador controla uma nave que se move verticalmente ⬆️⬇️, desviando e destruindo asteroides que aparecem pelo caminho 🌑.
+O jogador controla uma nave que se move horinzontalmente, desviando e destruindo asteroides que aparecem pelo caminho 🌑.
 
 ---
 
